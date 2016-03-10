@@ -47,6 +47,15 @@ test('create collection', function (t) {
     t.end()
 })
 
+test('call remote procedure through methodCall', function (t) {
+    var testClient = exist.createClient(connectionOptions)
+    var c = new Buffer('xquery version "3.0"; <result>beep</result>')
+    testClient.methodCall('executeQuery', [c, {}], function (err, resultHandle) {
+        t.ok(resultHandle >= 0, 'got resultHandle')
+        t.end()
+    });
+})
+
 test('run query, expect XML', function (t) {
     var testClient = exist.createClient(connectionOptions)
     return gulp.src('test.xql', srcOptions)

@@ -58,7 +58,8 @@ module.exports.createClient = function createClient(options) {
     return {
         dest: sendFilesWith(client),
         query: queryWith(client),
-        newer: checkForNewerWith(client)
+        newer: checkForNewerWith(client),
+        methodCall: client.methodCall.bind(client)
     }
 };
 
