@@ -6,27 +6,29 @@ const { createClient } = require('@existdb/gulp-exist')
 
 const del = require('delete')
 const zip = require('gulp-zip')
-const replace = require('gulp-replace')
+const replace = require('@existdb/gulp-replace-tmpl')
 const rename = require('gulp-rename')
 
 const sass = require('gulp-sass')
 const uglify = require('gulp-uglify-es').default
 
-const pkg = require('./package.json')
+const { version, license } = require('./package.json')
 
 // read metadata from .existdb.json
-const existJSON = require('./.existdb.json')
-const serverInfo = existJSON.servers.localhost
-const packageUri = existJSON.package.ns
+const existJson = require('./.existdb.json')
+const replacements = [existJson, {version, license}]
+
+const serverInfo = existJson.servers.localhost
 
 const target = serverInfo.root
+const { port, hostname } = new URL(serverInfo.server)
 const connectionOptions = {
-  basic_auth: {
-    user: serverInfo.user,
-    pass: serverInfo.password
-  },
-  secure: false,
-  port: 8080
+    basic_auth: {
+        user: serverInfo.user, 
+        pass: serverInfo.password
+    },
+    host: hostname,
+    port
 }
 const existClient = createClient(connectionOptions)
 
@@ -38,69 +40,6 @@ function clean (cb) {
 }
 exports.clean = clean
 
-/**
- * report problems in replacements in .tmpl files
- * replaces the problematic values with an empty string
- *
- * @param {String} match
- * @param {String} p1
- * @param {String} p2
- * @param {Number} offset
- * @param {String} string
- * @returns {String} empty string
- */
-function handleReplacementIssue (match, offset, string, path, message) {
-  const line = string.substring(0, offset).match(/\n/g).length + 1
-  const startIndex = Math.max(0, offset - 30)
-  const startEllipsis = Boolean(startIndex)
-  const start = string.substring(startIndex, offset)
-  const endIndex = (offset + match.length + Math.min(string.length, 30))
-  const endEllipsis = endIndex === string.length
-  const end = string.substr(offset + match.length, Math.min(string.length, 30))
-  console.warn(`\n\x1b[31m${match}\x1b[39m ${message}`)
-  console.warn(`Found at line ${line} in ${path}`)
-  console.warn(`${ellipsis(startEllipsis)}${start}\x1b[31m${match}\x1b[39m${end}${ellipsis(endEllipsis)}`)
-  return ''
-}
-
-/**
- * replace placeholders in the form @something@
- * similar to your normal .tmpl substitutions
- *
- * @param {String} match
- * @param {String} p1
- * @param {String} p2
- * @param {Number} offset
- * @param {String} string
- * @returns {String} replacement or empty string
- */
-function tmplReplacement (match, p1, p2, offset, string) {
-  const path = this.file.relative
-  if (!p1) {
-    return handleReplacementIssue(match, offset, string, path, "replacement must start with 'package.'")
-  }
-  // search for replacement in .existdb.json "package"
-  if (existJSON.package && p2 in existJSON.package) {
-    return existJSON.package[p2]
-  }
-  // search for replacement in package.json
-  if (p2 in pkg) {
-    return pkg[p2]
-  }
-  // missing substitution handling
-  return handleReplacementIssue(match, offset, string, path, 'is not set in package.json!')
-}
-
-/**
- * show that the file contents were shortened
- *
- * @param {Boolean} display
- * @returns {String} '...' if display is true, '' otherwise
- */
-function ellipsis (display) {
-  if (display) { return '...' }
-  return ''
-}
 
 /**
  * replace placeholders
@@ -109,7 +48,7 @@ function ellipsis (display) {
  */
 function templates () {
   return src('src/*.tmpl')
-    .pipe(replace(/@(package\.)?([^@]+)@/g, tmplReplacement))
+    .pipe(replace(replacements))
     .pipe(rename(path => { path.extname = '' }))
     .pipe(dest('build/'))
 }
@@ -183,7 +122,7 @@ function watchBuild () {
 }
 
 // construct the current xar name from available data
-const packageName = () => `${existJSON.package.target}-${pkg.version}.xar`
+const packageName = () => `${existJson.package.target}-${version}.xar`
 
 /**
  * create XAR package in repo root
@@ -199,7 +138,7 @@ function xar () {
  */
 async function installXar () {
   return src(packageName())
-    .pipe(existClient.install({ packageUri }))
+    .pipe(existClient.install())
 }
 
 // composed tasks
