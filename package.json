@@ -2,6 +2,9 @@
   "name": "@existdb/gulp-exist",
   "description": "Gulp-plugin to interoperate with eXist-db",
   "main": "index.js",
+  "engines": {
+    "node": "^14.18 || ^16.13 || >=18"
+  },
   "scripts": {
     "test": "standard --fix && tape spec/*.js",
     "semantic-release": "semantic-release"
